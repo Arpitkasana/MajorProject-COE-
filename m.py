@@ -274,30 +274,31 @@ def handle_Run(message):
         # Check if the user is in admin_id (admins have no cooldown)
         if user_id not in admin_id:
             # Check if the user has run the command before and is still within the cooldown period
-            if user_id in cooldown and (datetime.datetime.now() - cooldown[user_id]).seconds < COOLDOWN_TIME:
+            if user_id in Cooldown and (datetime.datetime.now() - Cooldown[user_id]).seconds < COOLDOWN_TIME:
                 response = "You Are On Cooldown ❌. Please Wait 10sec Before Running The /Run Command Again."
                 bot.reply_to(message, response)
                 return
             # Update the last time the user ran the command
-            cooldown[user_id] = datetime.datetime.now()
-        
+            Cooldown[user_id] = datetime.datetime.now()
+
         command = message.text.split()
         if len(command) == 4:
             Operation = command[1]
-            Parameter_1 = (command[2])
-            Parameter_2 = (command[3])
+            Parameter_1 = command[2]
+            Parameter_2 = command[3]
             
-                record_command_logs(user_id, '/Run', Operation, Parameter_1, Parameter_2)
-                log_command(user_id, Operation, Parameter_1, Parameter_2)
-                start_operation_reply(message, Operation, Parameter_1, Parameter_2)
-                response = f"Execution Finished. Operation: {Operation} Parameter_1: {Parameter_1} Parameter_2: {Parameter_2}"
-                bot.reply_to(message, response)  # Notify the user that the Operation is executed
+            record_command_logs(user_id, '/Run', Operation, Parameter_1, Parameter_2)
+            log_command(user_id, Operation, Parameter_1, Parameter_2)
+            start_operation_reply(message, Operation, Parameter_1, Parameter_2)
+            response = f"Execution Finished. Operation: {Operation} Parameter_1: {Parameter_1} Parameter_2: {Parameter_2}"
+            bot.reply_to(message, response)  # Notify the user that the Operation is executed
         else:
             response = "✅ Usage :- /Run <Operation> <Parameter_1> <Parameter_2>"
     else:
         response = ("🚫 Unauthorized Access! 🚫\n\nOops! It seems You are not Authorised to use this Command")
 
     bot.reply_to(message, response)
+
 
 
 # Add /mylogs command to display logs recorded for operation and website commands
@@ -399,6 +400,5 @@ while True:
     try:
         bot.polling(none_stop=True)
     except Exception as e:
-        print(e)
-
+        print(f"Error occurred: {e}")
 
