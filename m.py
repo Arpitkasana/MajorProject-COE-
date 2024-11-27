@@ -1,10 +1,11 @@
 import telebot
-import subprocess
+# import subprocess
 import datetime
 import os
+from config import BOT_TOKEN
 
 # insert your Telegram bot token here
-bot = telebot.TeleBot('7616201602:AAF7eOObVq1tEPWCFjeWz94DOgv0rUilnZY')
+bot = telebot.TeleBot(BOT_TOKEN)
 
 # Admin user IDs
 admin_id = ["5442939651"]
@@ -54,17 +55,10 @@ def clear_logs():
 # Function to record command logs
 def record_command_logs(user_id, command, Operation=None, Parameter_1=None, Parameter_2=None):
     log_entry = f"UserID: {user_id} | Operation: {Operation} | Parameter_1: {Parameter_1} | Parameter_2: {Parameter_2}"
-    if target:
-        log_entry += f" | Operation: {Operation}"
-    if port:
-        log_entry += f" | Parameter_1: {Parameter_1}"
-    if time:
-        log_entry += f" | Parameter_2: {Parameter_2}"
     
     with open(LOG_FILE, "a") as file:
         file.write(log_entry + "\n")
 
-import datetime
 
 # Dictionary to store the approval expiry date for each user
 user_approval_expiry = {}
@@ -103,29 +97,36 @@ def set_approval_expiry_date(user_id, duration, time_unit):
 def add_user(message):
     user_id = str(message.chat.id)
     if user_id in admin_id:
-        command = message.text.split()
-        if len(command) > 2:
+        command = message.text.split(maxsplit=2)  # Allow spaces in duration_str
+        if len(command) == 3:
             user_to_add = command[1]
             duration_str = command[2]
 
             try:
-                duration = int(duration_str[:-4])  # Extract the numeric part of the duration
+                # Extract numeric part and time unit
+                numeric_part = ''.join(filter(str.isdigit, duration_str))
+                if not numeric_part:
+                    raise ValueError("Missing numeric part in duration.")
+                duration = int(numeric_part)
                 if duration <= 0:
-                    raise ValueError
-                time_unit = duration_str[-4:].lower()  # Extract the time unit (e.g., 'hour', 'day', 'week', 'month')
+                    raise ValueError("Duration must be positive.")
+
+                time_unit = ''.join(filter(str.isalpha, duration_str)).lower()
                 if time_unit not in ('hour', 'hours', 'day', 'days', 'week', 'weeks', 'month', 'months'):
-                    raise ValueError
-            except ValueError:
-                response = "Invalid duration format. Please provide a positive integer followed by 'hour(s)', 'day(s)', 'week(s)', or 'month(s)'."
-                bot.reply_to(message, response)
+                    raise ValueError("Invalid time unit.")
+
+            except ValueError as e:
+                bot.reply_to(message, f"Invalid duration format: {e}. Please provide a positive integer followed by 'hour(s)', 'day(s)', 'week(s)', or 'month(s)'.")
                 return
 
+            # Add user and set approval expiry
             if user_to_add not in allowed_user_ids:
                 allowed_user_ids.append(user_to_add)
                 with open(USER_FILE, "a") as file:
                     file.write(f"{user_to_add}\n")
                 if set_approval_expiry_date(user_to_add, duration, time_unit):
-                    response = f"User {user_to_add} added successfully for {duration} {time_unit}. Access will expire on {user_approval_expiry[user_to_add].strftime('%d-%m-%Y %H:%M:%S')} 👍."
+                    expiry_date = user_approval_expiry[user_to_add].strftime('%d-%m-%Y %H:%M:%S')
+                    response = f"User {user_to_add} added successfully for {duration} {time_unit}. Access will expire on {expiry_date} 👍."
                 else:
                     response = "Failed to set approval expiry date. Please try again later."
             else:
@@ -133,9 +134,10 @@ def add_user(message):
         else:
             response = "Please specify a user ID and the duration (e.g., 1hour, 2days, 3weeks, 4months) to add 😘."
     else:
-        response = "You can't add Users"
+        response = "You are not authorized to add users ❌."
 
     bot.reply_to(message, response)
+
 
 # Command handler for retrieving user info
 @bot.message_handler(commands=['myinfo'])
@@ -258,7 +260,7 @@ def start_operation_reply(message, Operation, Parameter_1, Parameter_2):
     user_info = message.from_user
     username = user_info.username if user_info.username else user_info.first_name
     
-    response = f"{username}, Operation Started: {Operation} \n\n Parameter_1: {Parameter_1} \n\n Parameter_2: {Parmeter_2}"
+    response = f"{username}, Operation Started: {Operation} \n\n Parameter_1: {Parameter_1} \n\n Parameter_2: {Parameter_2}"
     bot.reply_to(message, response)
 
 # Dictionary to store the last time each user ran the /Run command
@@ -324,14 +326,15 @@ def show_command_logs(message):
 @bot.message_handler(commands=['help'])
 def show_help(message):
     help_text ='''🤖 Available commands:
-💥 /bgmi : For Executing Operations
+💥 /Run : For Executing Operations
 💥 /rules : Please Check Before Use !!.
 💥 /mylogs : To Check Your Recents operations.
 💥 /plan : Checkout Our Bot Plans
-💥 /myinfo : TO Check Your WHOLE INFO.
+💥 /myinfo : To Check Your WHOLE INFO.
 
 🤖 To See Admin Commands:
 💥 /admincmd : Shows All Admin Commands.'''
+    bot.reply_to(message, help_text)
 
 @bot.message_handler(commands=['start'])
 def welcome_start(message):
@@ -350,7 +353,7 @@ Use only for educational Purposes'''
 def welcome_plan(message):
     user_name = message.from_user.first_name
     response = f'''{user_name}, User Only Our Plan is Powerfull Then Any Other !!:\n
-Pr-ice List💸 :
+Price List💸 :
 Day--> Rs
 Week--> Rs
 Month--> Rs
@@ -363,7 +366,7 @@ def welcome_plan(message):
     response = f'''{user_name}, Admin Commands Are Here!!:
 
 💥 /add <userId> : Add a User.
-💥 /remove <userid> Remove a User.
+💥 /remove <userId> Remove a User.
 💥 /allusers : Authorised Users Lists.
 💥 /logs : All Users Logs.
 💥 /broadcast : Broadcast a Message.
@@ -398,7 +401,9 @@ def broadcast_message(message):
 #Bot Polling
 while True:
     try:
+        print("Bot is Running")
         bot.polling(none_stop=True)
     except Exception as e:
         print(f"Error occurred: {e}")
 
+#done
